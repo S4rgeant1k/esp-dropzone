@@ -1,0 +1,71 @@
+-- ESP для Dropzone: Игроки — Красные, Боты — Синие (Только обводка)
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+-- Настройки цветов контура
+local PLAYER_COLOR = Color3.fromRGB(255, 30, 30) -- Красный для реальных игроков
+local BOT_COLOR = Color3.fromRGB(0, 120, 255)    -- Синий для ботов
+
+local function clearOldESP(model)
+    local old = model:FindFirstChild("DropzoneESP")
+    if old then old:Destroy() end
+end
+
+-- Функция создания контура
+local function createHighlight(model, color)
+    clearOldESP(model)
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "DropzoneESP"
+    highlight.FillColor = Color3.fromRGB(0, 0, 0)
+    highlight.OutlineColor = color
+    highlight.FillTransparency = 1 -- Без заливки
+    highlight.OutlineTransparency = 0 -- Четкий контур
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- Видно сквозь стены
+    highlight.Adornee = model
+    highlight.Parent = model
+end
+
+-- Проверка: игрок это или бот
+local function checkAndApplyESP(model)
+    if not model:IsA("Model") or model == LocalPlayer.Character then return end
+    
+    -- Ждем базовые части персонажа/бота
+    local humanoid = model:WaitForChild("Humanoid", 3)
+    local root = model:WaitForChild("HumanoidRootPart", 3)
+    
+    if humanoid and root then
+        -- Проверяем, привязан ли к этой модели реальный игрок
+        local player = Players:GetPlayerFromCharacter(model)
+        
+        if player then
+            -- Это реальный игрок
+            createHighlight(model, PLAYER_COLOR)
+        else
+            -- Это бот (NPC)
+            createHighlight(model, BOT_COLOR)
+        end
+    end
+end
+
+-- Отслеживание появления новых объектов в игре (игроки и боты)
+Workspace.DescendantAdded:Connect(function(descendant)
+    if descendant.Name == "Humanoid" and descendant.Parent then
+        task.spawn(checkAndApplyESP, descendant.Parent)
+    end
+end)
+
+-- Сканирование уже созданных объектов при старте скрипта
+for _, descendant in ipairs(Workspace:GetDescendants()) do
+    if descendant.Name == "Humanoid" and descendant.Parent then
+        task.spawn(checkAndApplyESP, descendant.Parent)
+    end
+end
+
+-- Отдельная подстраховка для заходящих реальных игроков
+Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function(char)
+        task.spawn(checkAndApplyESP, char)
+    end)
+end)
